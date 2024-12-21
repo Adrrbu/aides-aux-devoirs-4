@@ -1,6 +1,3 @@
--- First, drop the uuid-ossp extension (we'll recreate it later)
-DROP EXTENSION IF EXISTS "uuid-ossp" CASCADE;
-
 -- First, disable RLS on all tables
 ALTER TABLE IF EXISTS users DISABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS profiles DISABLE ROW LEVEL SECURITY;
@@ -21,19 +18,13 @@ BEGIN
         EXECUTE 'DROP TABLE IF EXISTS public.' || quote_ident(r.tablename) || ' CASCADE';
     END LOOP;
 
-    -- Drop all functions in public schema
-    FOR r IN (
-        SELECT proname, oid 
-        FROM pg_proc 
-        WHERE pronamespace = 'public'::regnamespace
-    ) LOOP
-        BEGIN
-            EXECUTE 'DROP FUNCTION IF EXISTS public.' || quote_ident(r.proname) || '(' || 
-                    pg_get_function_identity_arguments(r.oid) || ') CASCADE';
-        EXCEPTION WHEN OTHERS THEN
-            RAISE NOTICE 'Could not drop function %', r.proname;
-        END;
-    END LOOP;
+    -- Drop our custom functions only
+    DROP FUNCTION IF EXISTS handle_new_user() CASCADE;
+    DROP FUNCTION IF EXISTS update_user_statistics() CASCADE;
+    DROP FUNCTION IF EXISTS update_user_statistics_on_exercise() CASCADE;
+    DROP FUNCTION IF EXISTS check_subscription() CASCADE;
+    DROP FUNCTION IF EXISTS get_user_profile() CASCADE;
+    DROP FUNCTION IF EXISTS update_wallet() CASCADE;
 
     -- Drop all types in public schema
     FOR r IN (
@@ -49,8 +40,5 @@ BEGIN
         END;
     END LOOP;
 END $$;
-
--- Recreate the uuid-ossp extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Recreate the schema (this will be handled by subsequent migrations)
