@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { UserPlus, Mail, Lock, User } from 'lucide-react';
-import { signUp } from '../services/auth';
+import { useAuth } from '../hooks/useAuth';
 import toast from 'react-hot-toast';
 
 interface SignUpFormProps {
@@ -8,6 +8,7 @@ interface SignUpFormProps {
 }
 
 const SignUpForm: React.FC<SignUpFormProps> = ({ onToggleForm }) => {
+  const { signUp } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -29,16 +30,13 @@ const SignUpForm: React.FC<SignUpFormProps> = ({ onToggleForm }) => {
         formData.firstName,
         formData.lastName
       );
-
-      if (result.success) {
-        toast.success(result.message);
+      
+      // Only toggle form if signup was successful
+      if (result?.success) {
         onToggleForm();
-      } else if (result.error) {
-        toast.error(result.error);
       }
     } catch (error: any) {
       console.error('Error during signup:', error);
-      toast.error(error.message || 'Une erreur est survenue lors de la création du compte');
     } finally {
       setIsLoading(false);
     }
@@ -107,6 +105,7 @@ const SignUpForm: React.FC<SignUpFormProps> = ({ onToggleForm }) => {
                 id="email"
                 name="email"
                 type="email"
+                autoComplete="email"
                 required
                 className="appearance-none rounded-xl relative block w-full pl-10 pr-3 py-2 border border-[#151313] bg-[#f7f7f5] placeholder-gray-500 text-[#151313] focus:outline-none focus:ring-[#ff5734] focus:border-[#ff5734] focus:z-10 sm:text-sm"
                 placeholder="Email"
@@ -126,6 +125,7 @@ const SignUpForm: React.FC<SignUpFormProps> = ({ onToggleForm }) => {
                 id="password"
                 name="password"
                 type="password"
+                autoComplete="current-password"
                 required
                 minLength={6}
                 className="appearance-none rounded-xl relative block w-full pl-10 pr-3 py-2 border border-[#151313] bg-[#f7f7f5] placeholder-gray-500 text-[#151313] focus:outline-none focus:ring-[#ff5734] focus:border-[#ff5734] focus:z-10 sm:text-sm"
@@ -141,23 +141,24 @@ const SignUpForm: React.FC<SignUpFormProps> = ({ onToggleForm }) => {
           <button
             type="submit"
             disabled={isLoading}
-            className={`group relative w-full flex justify-center py-2 px-4 border border-[#151313] text-sm font-medium rounded-xl text-white ${
-              isLoading ? 'bg-gray-400' : 'bg-[#ff5734] hover:bg-[#ff5734]/80'
-            } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ff5734] transition-colors duration-200`}
+            className={`group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-xl text-white bg-[#ff5734] hover:bg-[#ff5734]/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ff5734] ${
+              isLoading ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
           >
             {isLoading ? 'Création en cours...' : 'Créer mon compte'}
           </button>
         </div>
-      </form>
 
-      <div className="text-center">
-        <button
-          onClick={onToggleForm}
-          className="text-sm text-[#ff5734] hover:text-[#ff5734]/80"
-        >
-          Déjà un compte ? Se connecter
-        </button>
-      </div>
+        <div className="text-center">
+          <button
+            type="button"
+            onClick={onToggleForm}
+            className="text-sm text-[#ff5734] hover:text-[#ff5734]/90"
+          >
+            Déjà un compte ? Se connecter
+          </button>
+        </div>
+      </form>
     </div>
   );
 };

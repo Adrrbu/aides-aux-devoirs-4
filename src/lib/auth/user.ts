@@ -1,6 +1,22 @@
 import { supabase } from '../supabase';
 import { AuthResponse } from './types';
-import toast from 'react-hot-toast';
+
+const createUserProfile = async (userId: string, email: string, firstName: string, lastName: string) => {
+  console.log('Creating user profile for:', userId);
+  
+  // Create all user data in a single transaction
+  const { error } = await supabase.rpc('create_user_profile', {
+    p_user_id: userId,
+    p_email: email,
+    p_first_name: firstName,
+    p_last_name: lastName
+  });
+
+  if (error) {
+    console.error('Error creating user profile:', error);
+    throw error;
+  }
+};
 
 export const signUpUser = async (
   email: string,
@@ -9,7 +25,8 @@ export const signUpUser = async (
   lastName: string
 ): Promise<AuthResponse> => {
   try {
-    const { data, error } = await supabase.auth.signUp({
+    // Step 1: Sign up the user with Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -21,21 +38,26 @@ export const signUpUser = async (
       }
     });
 
-    if (error) throw error;
-    if (!data.user) throw new Error('Aucune donnée utilisateur retournée');
+    if (authError) throw authError;
+    if (!authData.user) throw new Error('Aucune donnée utilisateur retournée');
+
+    // Step 2: Create user profile, wallet, and statistics
+    await createUserProfile(authData.user.id, email, firstName, lastName);
 
     return { 
       success: true,
-      user: data.user,
+      user: authData.user,
       message: 'Compte créé avec succès ! Vérifiez votre email.'
     };
   } catch (error: any) {
-    console.error('Error during signup:', error);
-    toast.error(error.message || 'Erreur lors de la création du compte');
-    return {
-      success: false,
-      error: error.message
-    };
+    // If we get a duplicate error, it means the user already exists
+    if (error.code === '23505') {
+      return {
+        success: false,
+        error: 'Un compte avec cet email existe déjà'
+      };
+    }
+    throw error;
   }
 };
 
@@ -43,43 +65,26 @@ export const signInUser = async (
   email: string,
   password: string
 ): Promise<AuthResponse> => {
-  try {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password
+  });
 
-    if (error) throw error;
+  if (error) throw error;
 
-    return {
-      success: true,
-      user: data.user,
-      message: 'Connexion réussie !'
-    };
-  } catch (error: any) {
-    console.error('Error during signin:', error);
-    toast.error(error.message || 'Erreur lors de la connexion');
-    return {
-      success: false,
-      error: error.message
-    };
-  }
+  return {
+    success: true,
+    user: data.user,
+    message: 'Connexion réussie !'
+  };
 };
 
 export const signOutUser = async (): Promise<AuthResponse> => {
-  try {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-    return {
-      success: true,
-      message: 'Déconnexion réussie'
-    };
-  } catch (error: any) {
-    console.error('Error during signout:', error);
-    toast.error(error.message || 'Erreur lors de la déconnexion');
-    return {
-      success: false,
-      error: error.message
-    };
-  }
+  const { error } = await supabase.auth.signOut();
+  if (error) throw error;
+  
+  return {
+    success: true,
+    message: 'Déconnexion réussie'
+  };
 };

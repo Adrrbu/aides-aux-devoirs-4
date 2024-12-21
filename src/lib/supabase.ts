@@ -8,6 +8,7 @@ if (!supabaseUrl || !supabaseKey) {
   throw new Error('Missing Supabase environment variables');
 }
 
+// Create a single Supabase client instance for the entire app
 export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
   auth: {
     persistSession: true,
@@ -33,6 +34,9 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
   }
 });
 
+// Export the same instance for auth-specific usage
+export const supabaseClient = supabase;
+
 export const handleSupabaseError = (error: any): string => {
   console.error('Supabase Error Details:', {
     code: error.code,
@@ -51,16 +55,14 @@ export const handleSupabaseError = (error: any): string => {
       return 'Email invalide';
     case 'auth/wrong-password':
       return 'Mot de passe incorrect';
-    case '23505':
+    case 'auth/user-not-found':
+      return 'Utilisateur non trouvé';
+    case 'auth/email-already-in-use':
       return 'Cet email est déjà utilisé';
-    case '22P02':
-      return 'Format de données invalide';
-    case 'PGRST204':
-      return 'Erreur de configuration de la base de données';
-    case 'unexpected_failure':
-      return 'Une erreur inattendue est survenue. Veuillez réessayer.';
+    case '23505':
+      return 'Cette ressource existe déjà';
     default:
-      return error.message || 'Une erreur inattendue est survenue';
+      return error.message || 'Une erreur est survenue';
   }
 };
 
