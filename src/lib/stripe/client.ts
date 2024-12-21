@@ -1,7 +1,7 @@
 import { loadStripe } from '@stripe/stripe-js';
 import { SUBSCRIPTION_PLANS } from './plans';
 import { SubscriptionPlan } from '../../types/subscription';
-import { supabase } from '../supabase/client';
+import { supabase } from '../supabase';
 
 const STRIPE_PUBLIC_KEY = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
 if (!STRIPE_PUBLIC_KEY) {

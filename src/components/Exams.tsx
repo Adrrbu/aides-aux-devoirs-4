@@ -20,6 +20,7 @@ const Exams: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedExam, setSelectedExam] = useState<Exam | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadExams();
@@ -27,19 +28,31 @@ const Exams: React.FC = () => {
 
   const loadExams = async () => {
     try {
+      setLoading(true);
+      setError(null);
+
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        setError('Utilisateur non connecté');
+        return;
+      }
 
       const { data, error } = await supabase
-        .from('exams')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('due_date', { ascending: true });
+        .rpc('get_user_exams', {
+          p_user_id: user.id
+        });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading exams:', error);
+        setError('Erreur lors du chargement des contrôles');
+        toast.error('Erreur lors du chargement des contrôles');
+        return;
+      }
+
       setExams(data || []);
     } catch (error) {
       console.error('Error loading exams:', error);
+      setError('Erreur lors du chargement des contrôles');
       toast.error('Erreur lors du chargement des contrôles');
     } finally {
       setLoading(false);
@@ -53,9 +66,18 @@ const Exams: React.FC = () => {
 
   const handleExamDeleted = () => {
     loadExams();
+    setSelectedExam(null);
   };
 
   const cardClasses = "bg-white rounded-2xl p-6 shadow-sm border border-[#151313]";
+
+  if (error) {
+    return (
+      <div className="text-center text-red-600">
+        {error}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { SUBSCRIPTION_PLANS } from '../lib/stripe/plans';
 import { PlanLimits, Subscription } from '../types/subscription';
-import { supabase } from '../lib/supabase/client';
+import { supabase } from '../lib/supabase';
 import { useAuth } from './useAuth';
 import toast from 'react-hot-toast';
 
@@ -15,41 +15,24 @@ export const useSubscription = () => {
   });
 
   const fetchSubscription = useCallback(async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
     
     try {
+      // Use the RPC function to safely get or create subscription
       const { data, error } = await supabase
-        .from('subscriptions')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
+        .rpc('get_or_create_subscription', {
+          p_user_id: user.id
+        });
 
       if (error) throw error;
 
       if (data) {
         setSubscription(data);
-      } else {
-        // Create a free subscription if none exists
-        await supabase
-          .from('subscriptions')
-          .insert({
-            user_id: user.id,
-            plan_id: 'DECOUVERTE',
-            status: 'active',
-            current_period_end: '9999-12-31T23:59:59Z',
-            cancel_at_period_end: false
-          });
-        
-        setSubscription({
-          id: 'decouverte',
-          user_id: user.id,
-          plan_id: 'DECOUVERTE',
-          status: 'active',
-          current_period_end: '9999-12-31T23:59:59Z',
-          cancel_at_period_end: false
-        });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching subscription:', error);
       toast.error('Erreur lors de la récupération de l\'abonnement');
     } finally {
@@ -67,7 +50,7 @@ export const useSubscription = () => {
         .eq('user_id', user.id)
         .single();
 
-      if (error) throw error;
+      if (error && error.code !== 'PGRST116') throw error;
 
       if (data) {
         setUsageStats(data);
@@ -81,6 +64,12 @@ export const useSubscription = () => {
     if (user) {
       fetchSubscription();
       fetchUsageStats();
+    } else {
+      setSubscription(null);
+      setUsageStats({
+        aiquestions: 0,
+        exercisesperday: 0
+      });
     }
   }, [user, fetchSubscription, fetchUsageStats]);
 
@@ -100,30 +89,27 @@ export const useSubscription = () => {
         return false;
       }
     }
-
     return true;
   };
 
   const incrementUsage = async (limitType: keyof PlanLimits) => {
-    if (!user?.id) return false;
+    if (!user?.id) return;
 
     try {
-      const currentValue = usageStats[limitType] || 0;
-      const newValue = currentValue + 1;
+      const currentUsage = usageStats[limitType] || 0;
+      if (!checkLimit(limitType, currentUsage)) return false;
 
-      const { error } = await supabase
-        .from('usage_stats')
-        .upsert({
-          user_id: user.id,
-          [limitType]: newValue,
-          updated_at: new Date().toISOString()
-        });
+      const { error } = await supabase.rpc('increment_usage_stat', {
+        p_user_id: user.id,
+        p_stat_type: limitType
+      });
 
       if (error) throw error;
 
+      // Update local state
       setUsageStats(prev => ({
         ...prev,
-        [limitType]: newValue
+        [limitType]: (prev[limitType] || 0) + 1
       }));
 
       return true;
@@ -133,18 +119,36 @@ export const useSubscription = () => {
     }
   };
 
-  const refresh = useCallback(() => {
-    fetchSubscription();
-    fetchUsageStats();
-  }, [fetchSubscription, fetchUsageStats]);
+  const resetUsage = useCallback(async () => {
+    if (!user?.id) return;
+
+    try {
+      const { error } = await supabase
+        .from('usage_stats')
+        .upsert({
+          user_id: user.id,
+          aiquestions: 0,
+          exercisesperday: 0,
+          last_reset: new Date().toISOString()
+        });
+
+      if (error) throw error;
+
+      // Refresh stats
+      fetchSubscription();
+      fetchUsageStats();
+    } catch (error) {
+      console.error('Error resetting usage:', error);
+    }
+  }, [user?.id, fetchSubscription, fetchUsageStats]);
 
   return {
     subscription,
     loading,
+    usageStats,
     getCurrentPlan,
     checkLimit,
     incrementUsage,
-    usageStats,
-    refresh
+    resetUsage
   };
 };

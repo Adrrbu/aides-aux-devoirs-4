@@ -13,25 +13,59 @@ export const getCurrentUser = async (): Promise<User | null> => {
       .eq('id', user.id)
       .single();
 
-    if (error) throw error;
-    return data;
+    if (error) {
+      console.error('Error getting user data:', error);
+      throw error;
+    }
+
+    if (!data) {
+      console.error('No user data found');
+      return null;
+    }
+
+    return {
+      id: data.id,
+      email: data.email,
+      firstName: data.first_name,
+      lastName: data.last_name,
+      avatarUrl: data.avatar_url,
+      school: data.school,
+      address: data.address,
+      hasCompletedOnboarding: data.has_completed_onboarding,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    };
   } catch (error) {
     console.error('Error getting current user:', error);
+    toast.error('Erreur lors du chargement du profil');
     return null;
   }
 };
 
 export const updateUserProfile = async (userId: string, updates: UserUpdateData): Promise<boolean> => {
   try {
+    const updateData: any = {
+      updated_at: new Date().toISOString()
+    };
+
+    // Map camelCase to snake_case
+    if (updates.firstName !== undefined) updateData.first_name = updates.firstName;
+    if (updates.lastName !== undefined) updateData.last_name = updates.lastName;
+    if (updates.avatarUrl !== undefined) updateData.avatar_url = updates.avatarUrl;
+    if (updates.school !== undefined) updateData.school = updates.school;
+    if (updates.address !== undefined) updateData.address = updates.address;
+    if (updates.hasCompletedOnboarding !== undefined) updateData.has_completed_onboarding = updates.hasCompletedOnboarding;
+
     const { error } = await supabase
       .from('users')
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('id', userId);
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error updating profile:', error);
+      throw error;
+    }
+
     toast.success('Profil mis à jour avec succès');
     return true;
   } catch (error) {

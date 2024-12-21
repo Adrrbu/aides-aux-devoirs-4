@@ -2,6 +2,7 @@ import React from 'react';
 import { format, startOfWeek, addDays, isSameDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { supabase } from '../../lib/supabase';
+import toast from 'react-hot-toast';
 
 interface Event {
   id: string;
@@ -13,6 +14,7 @@ interface Event {
 const WeeklyPlanning: React.FC = () => {
   const [events, setEvents] = React.useState<Event[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     loadEvents();
@@ -20,26 +22,38 @@ const WeeklyPlanning: React.FC = () => {
 
   const loadEvents = async () => {
     try {
+      setLoading(true);
+      setError(null);
+
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        setError('Utilisateur non connecté');
+        return;
+      }
 
       const startDate = startOfWeek(new Date(), { weekStartsOn: 1 });
       const endDate = addDays(startDate, 7);
 
       const { data, error } = await supabase
-        .from('calendar_events')
-        .select('id, title, start_time, event_type')
-        .eq('user_id', user.id)
-        .gte('start_time', startDate.toISOString())
-        .lt('start_time', endDate.toISOString())
-        .order('start_time', { ascending: true });
+        .rpc('get_user_events', {
+          p_user_id: user.id,
+          p_start_date: startDate.toISOString(),
+          p_end_date: endDate.toISOString()
+        });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading events:', error);
+        setError('Erreur lors du chargement des évènements');
+        toast.error('Erreur lors du chargement des évènements');
+        return;
+      }
 
       setEvents(data || []);
-      setLoading(false);
     } catch (error) {
       console.error('Error loading events:', error);
+      setError('Erreur lors du chargement des évènements');
+      toast.error('Erreur lors du chargement des évènements');
+    } finally {
       setLoading(false);
     }
   };
@@ -65,6 +79,14 @@ const WeeklyPlanning: React.FC = () => {
             </div>
           ))}
         </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center text-red-600">
+        {error}
       </div>
     );
   }

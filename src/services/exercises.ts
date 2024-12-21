@@ -8,8 +8,10 @@ export interface Exercise {
   description: string;
   content: any;
   difficulty_level: string;
-  subject_id: string;
-  topic_id?: string;
+  subject_name?: string;
+  topic_name?: string;
+  best_score?: number;
+  created_at?: string;
 }
 
 export const generateExercise = async (
@@ -21,16 +23,19 @@ export const generateExercise = async (
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Non authentifié');
 
-    // Récupérer l'ID de la matière
+    // Get subject ID
     const { data: subjectData, error: subjectError } = await supabase
       .from('subjects')
       .select('id')
       .eq('name', subject)
       .single();
 
-    if (subjectError) throw subjectError;
+    if (subjectError) {
+      console.error('Error getting subject:', subjectError);
+      throw new Error('Matière non trouvée');
+    }
 
-    // Récupérer l'ID du thème si fourni
+    // Get topic ID if provided
     let topicId = null;
     if (topic) {
       const { data: topicData, error: topicError } = await supabase
@@ -40,12 +45,30 @@ export const generateExercise = async (
         .eq('name', topic)
         .single();
 
-      if (!topicError) {
+      if (!topicError && topicData) {
         topicId = topicData.id;
+      } else {
+        // Create new topic if it doesn't exist
+        const { data: newTopic, error: createError } = await supabase
+          .from('subject_topics')
+          .insert({
+            subject_id: subjectData.id,
+            name: topic,
+            description: `Thème de ${subject}`
+          })
+          .select()
+          .single();
+
+        if (createError) {
+          console.error('Error creating topic:', createError);
+          throw new Error('Erreur lors de la création du thème');
+        }
+
+        topicId = newTopic.id;
       }
     }
 
-    // Générer l'exercice avec l'IA
+    // Generate exercise with AI
     const prompt = `Génère un exercice de ${subject} sur le thème "${topic}" pour un niveau ${level}. 
     L'exercice doit être adapté au niveau scolaire et inclure des questions progressives.`;
     
@@ -55,7 +78,7 @@ export const generateExercise = async (
       throw new Error('Format de réponse invalide');
     }
 
-    // Créer l'exercice dans la base de données
+    // Create exercise in database
     const { data: exercise, error: insertError } = await supabase
       .from('exercises')
       .insert([{
@@ -71,13 +94,16 @@ export const generateExercise = async (
       .select()
       .single();
 
-    if (insertError) throw insertError;
+    if (insertError) {
+      console.error('Error creating exercise:', insertError);
+      throw new Error('Erreur lors de la création de l\'exercice');
+    }
 
     toast.success('Exercice généré avec succès');
     return exercise;
   } catch (error: any) {
     console.error('Error generating exercise:', error);
-    toast.error('Erreur lors de la génération de l\'exercice');
+    toast.error(error.message || 'Erreur lors de la génération de l\'exercice');
     throw error;
   }
 };
@@ -88,19 +114,19 @@ export const getExercises = async () => {
     if (!user) throw new Error('Non authentifié');
 
     const { data, error } = await supabase
-      .from('exercises')
-      .select(`
-        *,
-        subject:subject_id (name),
-        topic:topic_id (name)
-      `)
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
+      .rpc('get_user_exercises', {
+        p_user_id: user.id
+      });
 
-    if (error) throw error;
-    return data;
-  } catch (error) {
-    console.error('Error loading exercises:', error);
+    if (error) {
+      console.error('Error getting exercises:', error);
+      throw new Error('Erreur lors de la récupération des exercices');
+    }
+
+    return data || [];
+  } catch (error: any) {
+    console.error('Error getting exercises:', error);
+    toast.error(error.message || 'Erreur lors de la récupération des exercices');
     throw error;
   }
 };

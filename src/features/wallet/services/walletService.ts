@@ -3,73 +3,91 @@ import toast from 'react-hot-toast';
 
 export const getWalletBalance = async (userId: string) => {
   try {
-    const { data: wallet } = await supabase
-      .from('wallets')
-      .select('balance')
-      .eq('user_id', userId)
-      .single();
+    const { data, error } = await supabase
+      .rpc('get_or_create_wallet', {
+        p_user_id: userId
+      });
 
-    return wallet?.balance || 0;
+    if (error) {
+      console.error('Error getting wallet:', error);
+      toast.error('Erreur lors du chargement du portefeuille');
+      return 0;
+    }
+
+    return data[0]?.balance || 0;
   } catch (error) {
     console.error('Error getting wallet balance:', error);
+    toast.error('Erreur lors du chargement du portefeuille');
     return 0;
   }
 };
 
 export const addFunds = async (userId: string, amount: number) => {
   try {
-    const { data: wallet } = await supabase
-      .from('wallets')
-      .select('id, balance')
-      .eq('user_id', userId)
-      .single();
+    // First get or create the wallet
+    const { data: wallet, error: walletError } = await supabase
+      .rpc('get_or_create_wallet', {
+        p_user_id: userId
+      });
 
-    if (!wallet) throw new Error('Wallet not found');
+    if (walletError) {
+      console.error('Error getting wallet:', walletError);
+      throw new Error('Erreur lors de la récupération du portefeuille');
+    }
 
-    const { error: updateError } = await supabase
-      .from('wallets')
-      .update({ 
-        balance: wallet.balance + amount
-      })
-      .eq('id', wallet.id);
+    if (!wallet || wallet.length === 0) {
+      throw new Error('Portefeuille non trouvé');
+    }
 
-    if (updateError) throw updateError;
+    // Add funds using the RPC function
+    const { error: fundError } = await supabase
+      .rpc('add_wallet_funds', {
+        p_wallet_id: wallet[0].id,
+        p_amount: amount,
+        p_description: 'Rechargement par parent',
+        p_transaction_type: 'wallet'
+      });
 
-    const { error: transactionError } = await supabase
-      .from('wallet_transactions')
-      .insert([{
-        wallet_id: wallet.id,
-        amount: amount,
-        type: 'credit',
-        description: 'Rechargement par parent',
-        transaction_type: 'wallet'
-      }]);
-
-    if (transactionError) throw transactionError;
+    if (fundError) {
+      console.error('Error adding funds:', fundError);
+      throw new Error('Erreur lors du rechargement du portefeuille');
+    }
 
     return true;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error adding funds:', error);
-    toast.error('Erreur lors du rechargement du portefeuille');
+    toast.error(error.message || 'Erreur lors du rechargement du portefeuille');
     throw error;
   }
 };
 
 export const getTransactions = async (userId: string) => {
   try {
-    const { data: wallet } = await supabase
-      .from('wallets')
-      .select('id')
-      .eq('user_id', userId)
-      .single();
+    // First get or create the wallet
+    const { data: wallet, error: walletError } = await supabase
+      .rpc('get_or_create_wallet', {
+        p_user_id: userId
+      });
 
-    if (!wallet) return [];
+    if (walletError) {
+      console.error('Error getting wallet:', walletError);
+      return [];
+    }
 
-    const { data: transactions } = await supabase
+    if (!wallet || wallet.length === 0) {
+      return [];
+    }
+
+    const { data: transactions, error: transactionError } = await supabase
       .from('wallet_transactions')
       .select('*')
-      .eq('wallet_id', wallet.id)
+      .eq('wallet_id', wallet[0].id)
       .order('created_at', { ascending: false });
+
+    if (transactionError) {
+      console.error('Error getting transactions:', transactionError);
+      return [];
+    }
 
     return transactions || [];
   } catch (error) {

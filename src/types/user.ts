@@ -4,6 +4,8 @@ export interface User {
   firstName: string;
   lastName: string;
   avatarUrl?: string | null;
+  school?: string | null;
+  address?: string | null;
   hasCompletedOnboarding: boolean;
   createdAt: string;
   updatedAt: string;
@@ -17,5 +19,7 @@ export interface UserUpdateData {
   firstName?: string;
   lastName?: string;
   avatarUrl?: string | null;
+  school?: string | null;
+  address?: string | null;
   hasCompletedOnboarding?: boolean;
 }
