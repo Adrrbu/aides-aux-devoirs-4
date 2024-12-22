@@ -33,7 +33,7 @@ export const signUpUser = async (
         data: {
           first_name: firstName,
           last_name: lastName,
-          role: 'user'
+          role: 'student'
         }
       }
     });

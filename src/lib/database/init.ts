@@ -24,7 +24,7 @@ export const initializeDatabase = async () => {
           email: user.email,
           first_name: user.user_metadata?.first_name || '',
           last_name: user.user_metadata?.last_name || '',
-          role: 'user', // S'assurer que le rôle est 'user'
+          role: 'student', // S'assurer que le rôle est 'user'
           has_completed_onboarding: false,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()

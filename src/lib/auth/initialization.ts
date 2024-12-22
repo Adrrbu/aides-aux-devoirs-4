@@ -16,7 +16,7 @@ export const initializeUserProfile = async (
     email,
     first_name: firstName,
     last_name: lastName,
-    role: 'user',
+    role: 'student',
     has_completed_onboarding: false,
     preferences: {
       theme: 'light',

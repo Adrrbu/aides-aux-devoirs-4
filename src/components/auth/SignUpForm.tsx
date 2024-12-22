@@ -16,6 +16,28 @@ const SignUpForm: React.FC<SignUpFormProps> = ({ onToggleForm }) => {
   });
   const [isLoading, setIsLoading] = useState(false);
 
+  const createWallet = async (userId: string) => {
+    try {
+      const { error: walletError } = await supabase
+        .from('wallets')
+        .insert([{
+          user_id: userId,
+          balance: 0,
+          created_at: new Date().toISOString()
+        }]);
+
+      if (walletError) {
+        console.error('Wallet creation error:', walletError);
+        throw walletError;
+      }
+
+      console.log('Wallet created successfully');
+    } catch (error: any) {
+      console.error('Error creating wallet:', error);
+      throw error;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isLoading) return;
@@ -43,42 +65,11 @@ const SignUpForm: React.FC<SignUpFormProps> = ({ onToggleForm }) => {
 
       console.log('User created in Auth:', data.user);
 
-      // 2. Créer le profil utilisateur
-      const { error: profileError } = await supabase
-        .from('users')
-        .upsert([{
-          id: data.user.id,
-          email: formData.email,
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          role: 'student',
-          has_completed_onboarding: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }]);
+      // Wait a moment for the trigger to complete
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-      if (profileError) {
-        console.error('Profile creation error:', profileError);
-        throw profileError;
-      }
-
-      console.log('User profile created successfully');
-
-      // 3. Créer le wallet
-      const { error: walletError } = await supabase
-        .from('wallets')
-        .insert([{
-          user_id: data.user.id,
-          balance: 0,
-          created_at: new Date().toISOString()
-        }]);
-
-      if (walletError) {
-        console.error('Wallet creation error:', walletError);
-        throw walletError;
-      }
-
-      console.log('Wallet created successfully');
+      // Create wallet (this is now handled by the trigger)
+      console.log('User profile and wallet created by trigger');
 
       toast.success('Compte créé avec succès ! Vérifiez votre email.');
       onToggleForm();
